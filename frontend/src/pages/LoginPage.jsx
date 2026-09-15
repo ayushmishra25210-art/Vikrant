@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, Loader2, Fingerprint, MessageSquareLock } from 'lucide-react';
+import { Lock, User, Loader2, Fingerprint, MessageSquareLock, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+const DEMO_CREDENTIALS = [
+  { role: 'Admin', employeeId: 'EMP001', password: 'Admin@123', name: 'Rajesh Kumar Sharma' },
+  { role: 'Recipient', employeeId: 'EMP101', password: 'Recipient@123', name: 'Anita Desai' },
+  { role: 'Recipient', employeeId: 'EMP102', password: 'Recipient@123', name: 'Vikram Singh Rathore' },
+  { role: 'Recipient', employeeId: 'EMP103', password: 'Recipient@123', name: 'Priya Nair' },
+];
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -11,6 +18,13 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
+
+  const fillCredentials = (cred) => {
+    setEmployeeId(cred.employeeId);
+    setPassword(cred.password);
+    setError('');
+    setNotice('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -120,10 +134,58 @@ export default function LoginPage() {
               </div>
             </form>
 
-            <div className="mt-6 border-t border-gray-200 pt-4 text-[12px] text-gray-500">
-              <p className="font-medium text-gray-700 mb-1">Demonstration Credentials</p>
-              <p>Admin: EMP001 / Admin@123</p>
-              <p>Recipient: EMP101, EMP102, EMP103 / Recipient@123</p>
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-gray-700">
+                  <KeyRound size={13} className="text-navy-600" /> Demonstration Credentials
+                </p>
+                <span className="text-[10px] font-semibold tracking-wide text-warning bg-warning-bg border border-amber-200 rounded px-1.5 py-0.5">
+                  DEMO ONLY
+                </span>
+              </div>
+              <div className="border border-gray-200 rounded overflow-hidden">
+                <table className="gov-table !text-[12.5px]">
+                  <thead>
+                    <tr>
+                      <th>Role</th>
+                      <th>Employee ID</th>
+                      <th>Password</th>
+                      <th>Name</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DEMO_CREDENTIALS.map((cred) => (
+                      <tr key={cred.employeeId}>
+                        <td>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium border ${
+                              cred.role === 'Admin'
+                                ? 'bg-navy-50 text-navy-700 border-navy-100'
+                                : 'bg-success-bg text-success border-green-200'
+                            }`}
+                          >
+                            {cred.role}
+                          </span>
+                        </td>
+                        <td className="font-mono">{cred.employeeId}</td>
+                        <td className="font-mono">{cred.password}</td>
+                        <td>{cred.name}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => fillCredentials(cred)}
+                            className="btn btn-secondary !py-1 !px-2.5 text-[11.5px]"
+                          >
+                            Fill
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">Click "Fill" to autofill the sign-in form above, then press Sign In.</p>
             </div>
           </div>
         </div>
