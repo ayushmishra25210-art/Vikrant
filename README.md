@@ -35,11 +35,14 @@ sih-crypto-provenance/
 │       │                      Ledger, LeakInvestigation, Audit, RecipientDashboard, RecipientHistory
 │       └── routes/            ProtectedRoute (JWT + role-based guard)
 ├── postman_collection.json   Ready-to-import Postman collection for every API endpoint
+├── package.json               Root orchestration scripts (concurrently runs both dev servers)
 └── README.md
 ```
 
 The backend and frontend are fully independent Node projects — each has its own `package.json`, `.env`, and dev
-server. Neither requires the other to be running to `npm install`.
+server, and each can be installed/run entirely on its own. The root `package.json` adds nothing but convenience: it
+uses [`concurrently`](https://www.npmjs.com/package/concurrently) to start both dev servers with one command and
+colour-coded, prefixed log output (`[BACKEND]` / `[FRONTEND]`).
 
 ---
 
@@ -53,7 +56,23 @@ server. Neither requires the other to be running to `npm install`.
 
 ## 3. Setup & Run
 
-### Backend
+### Option A — one command from the repo root (recommended)
+
+```bash
+npm run install:all   # installs root, backend and frontend dependencies
+cp backend/.env.example backend/.env       # edit if your Mongo URI / ports differ
+cp frontend/.env.example frontend/.env     # edit if your API base URL differs
+npm run seed           # creates 1 admin, 3 recipients, 5 documents, sample ledger entries
+npm run dev             # starts BOTH servers concurrently — backend :5050, frontend :5173
+```
+
+Backend and frontend logs are interleaved in one terminal, each prefixed `[BACKEND]` / `[FRONTEND]` and colour-coded.
+Press `Ctrl+C` once to stop both. You can also run just one side with `npm run dev:backend` or `npm run dev:frontend`
+from the root.
+
+### Option B — backend and frontend run independently, in separate terminals
+
+#### Backend
 
 ```bash
 cd backend
@@ -66,7 +85,7 @@ npm run dev                # starts the API on http://localhost:5050
 > **Note:** the default port is `5050`, not `5000` — macOS reserves `5000` for AirPlay Receiver / Control Center on
 > many systems, which conflicts with the common Express default. Change `PORT` in `.env` if you need a different port.
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
