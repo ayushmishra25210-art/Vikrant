@@ -1,0 +1,11 @@
+node_modules/
+.env
+uploads/encrypted/*
+uploads/temp/*
+uploads/decrypted/*
+!uploads/encrypted/.gitkeep
+!uploads/temp/.gitkeep
+!uploads/decrypted/.gitkeep
+keys/
+ledger.json
+*.log

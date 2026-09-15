@@ -1,0 +1,137 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, User, Loader2, Fingerprint, MessageSquareLock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+export default function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [employeeId, setEmployeeId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const user = await login(employeeId, password);
+      navigate(user.role === 'admin' ? '/admin/dashboard' : '/recipient/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-surface flex flex-col">
+      <div className="h-1.5 w-full bg-gradient-to-r from-[#0B3D91] via-[#FFFFFF] to-[#FF9933]" />
+      <header className="bg-navy-600 text-white py-3 px-6 flex items-center gap-3">
+        <img src="/emblem.svg" alt="Government of India" className="w-8 h-8" />
+        <div>
+          <p className="text-[14px] font-semibold">Government of India</p>
+          <p className="text-[11px] text-navy-100 opacity-85">National Informatics Centre &middot; e-Prahari Portal</p>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-5 shadow-sm border border-gray-200 rounded overflow-hidden bg-white">
+          <div className="md:col-span-2 bg-navy-700 text-white p-8 flex flex-col justify-between">
+            <div>
+              <img src="/emblem.svg" alt="" className="w-14 h-14 mb-5" />
+              <h1 className="text-[22px] font-semibold leading-snug">e-Prahari</h1>
+              <p className="text-[13px] text-navy-100 opacity-90 mt-1">
+                Cryptographic Attribution and Immutable Decryption Provenance System for Multi-Recipient Encrypted Document Distribution
+              </p>
+            </div>
+            <ul className="text-[12.5px] text-navy-100 opacity-90 space-y-2 mt-8">
+              <li>&bull; AES-256-GCM document encryption</li>
+              <li>&bull; RSA-4096 per-recipient key protection</li>
+              <li>&bull; Ed25519 signed attribution tokens</li>
+              <li>&bull; Immutable, chain-verified provenance ledger</li>
+            </ul>
+            <p className="text-[10.5px] text-navy-100 opacity-60 mt-8">
+              This is an official Government of India information system. Unauthorised access is a punishable offence under the IT Act, 2000.
+            </p>
+          </div>
+
+          <div className="md:col-span-3 p-8">
+            <h2 className="text-section-heading text-gray-900">Secure Sign In</h2>
+            <p className="text-[13px] text-gray-500 mt-1 mb-5">Enter your registered Employee ID and password to continue.</p>
+
+            {notice && <p className="text-[12.5px] text-navy-700 bg-navy-50 border border-navy-100 rounded px-3 py-2 mb-3">{notice}</p>}
+            {error && <p className="text-[12.5px] text-danger bg-danger-bg border border-red-200 rounded px-3 py-2 mb-3">{error}</p>}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="gov-label">Employee ID</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    className="gov-input pl-9"
+                    placeholder="e.g. EMP001"
+                    value={employeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="gov-label">Password</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="password"
+                    className="gov-input pl-9"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+                {loading ? <Loader2 size={15} className="animate-spin" /> : null}
+                {loading ? 'Authenticating...' : 'Sign In'}
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setNotice('Digital Certificate (DSC) login requires a registered USB token / smart card reader. Not available in this demonstration environment.')}
+                  className="btn btn-outline text-[13px]"
+                >
+                  <Fingerprint size={14} /> Digital Certificate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotice('An OTP has been simulated as sent to your registered mobile number. OTP-based login is disabled in this demonstration build — please use your Employee ID and password.')}
+                  className="btn btn-outline text-[13px]"
+                >
+                  <MessageSquareLock size={14} /> Login with OTP
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-6 border-t border-gray-200 pt-4 text-[12px] text-gray-500">
+              <p className="font-medium text-gray-700 mb-1">Demonstration Credentials</p>
+              <p>Admin: EMP001 / Admin@123</p>
+              <p>Recipient: EMP101, EMP102, EMP103 / Recipient@123</p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer className="text-center text-[11px] text-gray-500 py-4 border-t border-gray-200 bg-white">
+        &copy; 2026 National Informatics Centre. Content owned by respective participating departments.
+      </footer>
+    </div>
+  );
+}
