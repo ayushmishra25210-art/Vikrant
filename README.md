@@ -14,10 +14,10 @@ decrypted it — all real cryptography, no simulated placeholders.
 
 ```
 sih-crypto-provenance/
-├── backend/                 Express + MongoDB API (independent, runs on :5050)
+├── backend/                 Express + PostgreSQL API (independent, runs on :5050)
 │   ├── src/
 │   │   ├── config/          DB connection, constants
-│   │   ├── models/          User, Document, Ledger (Mongoose schemas)
+│   │   ├── models/          User, Document, DocumentRecipient, Ledger (Sequelize models)
 │   │   ├── middleware/      JWT auth, role guard, multer upload, error handler
 │   │   ├── controllers/     auth, document, ledger, verify-leak, recipient, stats
 │   │   ├── routes/          Express routers per resource
@@ -49,8 +49,9 @@ colour-coded, prefixed log output (`[BACKEND]` / `[FRONTEND]`).
 ## 2. Prerequisites
 
 - Node.js 18+ and npm
-- MongoDB running locally (or a connection string to a reachable instance)
-  - macOS (Homebrew): `brew install mongodb-community && brew services start mongodb-community`
+- PostgreSQL running locally (or a connection string to a reachable instance)
+  - macOS (Homebrew): `brew install postgresql@16 && brew services start postgresql@16`
+  - Then create the database: `createdb sih_crypto_provenance`
 
 ---
 
@@ -59,10 +60,11 @@ colour-coded, prefixed log output (`[BACKEND]` / `[FRONTEND]`).
 ### Option A — one command from the repo root (recommended)
 
 ```bash
+createdb sih_crypto_provenance   # one-time: create the Postgres database (see Prerequisites)
 npm run install:all   # installs root, backend and frontend dependencies
-cp backend/.env.example backend/.env       # edit if your Mongo URI / ports differ
+cp backend/.env.example backend/.env       # edit DATABASE_URL if your Postgres user/password/port differ
 cp frontend/.env.example frontend/.env     # edit if your API base URL differs
-npm run seed           # creates 1 admin, 3 recipients, 5 documents, sample ledger entries
+npm run seed           # creates all tables, then 1 admin, 3 recipients, 5 documents, sample ledger entries
 npm run dev             # starts BOTH servers concurrently — backend :5050, frontend :5173
 ```
 
@@ -75,10 +77,11 @@ from the root.
 #### Backend
 
 ```bash
+createdb sih_crypto_provenance   # one-time: create the Postgres database
 cd backend
 npm install
-cp .env.example .env      # edit if your Mongo URI / ports differ
-npm run seed              # creates 1 admin, 3 recipients, 5 documents, sample ledger entries
+cp .env.example .env      # edit DATABASE_URL if your Postgres user/password/port differ
+npm run seed              # creates all tables, then 1 admin, 3 recipients, 5 documents, sample ledger entries
 npm run dev                # starts the API on http://localhost:5050
 ```
 
@@ -181,7 +184,7 @@ Base URL: `http://localhost:5050/api` (see `postman_collection.json` for a ready
 **backend/.env**
 ```
 PORT=5050
-MONGO_URI=mongodb://127.0.0.1:27017/sih_crypto_provenance
+DATABASE_URL=postgres://<your-os-username>@127.0.0.1:5432/sih_crypto_provenance
 JWT_SECRET=change_this_to_a_long_random_secret_in_production
 JWT_EXPIRES_IN=8h
 LEDGER_GENESIS_SEED=SIH-CRYPTO-PROVENANCE-GENESIS-BLOCK
@@ -197,8 +200,8 @@ VITE_API_BASE_URL=http://localhost:5050/api
 
 ## 9. Known Limitations (demo scope, disclosed honestly)
 
-- Private keys (RSA + Ed25519) are stored server-side in MongoDB for demonstration purposes so the API can act on a
-  recipient's behalf without a client-side key-management flow. A production system would generate/store private
+- Private keys (RSA + Ed25519) are stored server-side in PostgreSQL for demonstration purposes so the API can act on
+  a recipient's behalf without a client-side key-management flow. A production system would generate/store private
   keys client-side or in an HSM/KMS, with the server holding only public keys.
 - Digital Certificate (DSC) login and OTP login on the login page are UI-only affordances that show an explanatory
   message — full smart-card/OTP integration is out of scope for a 24-hour MVP.
@@ -209,4 +212,4 @@ VITE_API_BASE_URL=http://localhost:5050/api
 ## 10. Tech Stack
 
 **Frontend:** React 18 (Vite), Tailwind CSS, React Router, Axios, Lucide Icons
-**Backend:** Node.js, Express.js, MongoDB, Mongoose, JWT, Multer, Node `crypto`, `pdf-lib`, dotenv, CORS
+**Backend:** Node.js, Express.js, PostgreSQL, Sequelize, JWT, Multer, Node `crypto`, `pdf-lib`, dotenv, CORS

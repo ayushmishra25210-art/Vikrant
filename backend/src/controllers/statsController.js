@@ -1,6 +1,5 @@
-const Document = require('../models/Document');
-const User = require('../models/User');
-const Ledger = require('../models/Ledger');
+const { Op } = require('sequelize');
+const { Document, User, Ledger, DocumentRecipient } = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 
 // GET /dashboard/stats — admin summary cards + recent activity table
@@ -9,15 +8,18 @@ const getAdminStats = asyncHandler(async (req, res) => {
   startOfToday.setHours(0, 0, 0, 0);
 
   const [documentsUploaded, activeRecipients, todaysDecryptions, provenanceRecords, recentEntries] = await Promise.all([
-    Document.countDocuments(),
-    User.countDocuments({ role: 'recipient' }),
-    Ledger.countDocuments({ timestamp: { $gte: startOfToday } }),
-    Ledger.countDocuments(),
-    Ledger.find()
-      .sort({ sequence: -1 })
-      .limit(10)
-      .populate('recipientId', 'employeeId name')
-      .populate('documentId', 'originalName classification'),
+    Document.count(),
+    User.count({ where: { role: 'recipient' } }),
+    Ledger.count({ where: { timestamp: { [Op.gte]: startOfToday } } }),
+    Ledger.count(),
+    Ledger.findAll({
+      order: [['sequence', 'DESC']],
+      limit: 10,
+      include: [
+        { model: User, as: 'recipient', attributes: ['id', 'employeeId', 'name'] },
+        { model: Document, as: 'document', attributes: ['id', 'originalName', 'classification'] },
+      ],
+    }),
   ]);
 
   res.json({
@@ -30,9 +32,9 @@ const getAdminStats = asyncHandler(async (req, res) => {
     recentActivity: recentEntries.map((e) => ({
       sequence: e.sequence,
       tokenId: e.tokenId,
-      recipient: e.recipientId ? `${e.recipientId.name} (${e.recipientId.employeeId})` : 'Unknown',
-      document: e.documentId ? e.documentId.originalName : 'Unknown',
-      classification: e.documentId ? e.documentId.classification : '-',
+      recipient: e.recipient ? `${e.recipient.name} (${e.recipient.employeeId})` : 'Unknown',
+      document: e.document ? e.document.originalName : 'Unknown',
+      classification: e.document ? e.document.classification : '-',
       timestamp: e.timestamp,
       deviceId: e.deviceId,
     })),
@@ -41,15 +43,13 @@ const getAdminStats = asyncHandler(async (req, res) => {
 
 // GET /dashboard/recipient-stats — recipient-facing summary
 const getRecipientStats = asyncHandler(async (req, res) => {
-  const recipientId = req.user._id;
-  const documents = await Document.find({ 'recipients.recipient': recipientId });
-  const assigned = documents.length;
-  const decrypted = documents.filter((d) =>
-    d.recipients.some((r) => String(r.recipient) === String(recipientId) && r.status === 'decrypted')
-  ).length;
+  const recipientId = req.user.id;
+  const assignments = await DocumentRecipient.findAll({ where: { recipientId } });
+  const assigned = assignments.length;
+  const decrypted = assignments.filter((a) => a.status === 'decrypted').length;
   const pending = assigned - decrypted;
 
-  const myLedgerCount = await Ledger.countDocuments({ recipientId });
+  const myLedgerCount = await Ledger.count({ where: { recipientId } });
 
   res.json({
     cards: {

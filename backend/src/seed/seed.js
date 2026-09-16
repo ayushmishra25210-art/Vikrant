@@ -5,9 +5,7 @@ const bcrypt = require('bcryptjs');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
 const connectDB = require('../config/db');
-const User = require('../models/User');
-const Document = require('../models/Document');
-const Ledger = require('../models/Ledger');
+const { sequelize, User, Document, DocumentRecipient, Ledger } = require('../models');
 const cryptoService = require('../services/cryptoService');
 const pdfService = require('../services/pdfService');
 const ledgerService = require('../services/ledgerService');
@@ -74,26 +72,29 @@ async function encryptAndStore({ pdfBytes, filename, classification, description
   fs.writeFileSync(encryptedPath, encryptedData);
 
   const adminEncryptedAESKey = cryptoService.rsaWrapKey(uploader.rsaPublicKey, aesKey);
-  const recipientEntries = recipients.map((r) => ({
-    recipient: r._id,
-    encryptedAESKey: cryptoService.rsaWrapKey(r.rsaPublicKey, aesKey),
-    status: 'pending',
-  }));
 
   const document = await Document.create({
     filename: encryptedFilename,
     originalName: filename,
     description,
     classification,
-    uploader: uploader._id,
+    uploaderId: uploader.id,
     hash,
     fileSize: pdfBytes.length,
     encryptedPath,
     iv: iv.toString('base64'),
     authTag: authTag.toString('base64'),
     adminEncryptedAESKey,
-    recipients: recipientEntries,
   });
+
+  await DocumentRecipient.bulkCreate(
+    recipients.map((r) => ({
+      documentId: document.id,
+      recipientId: r.id,
+      encryptedAESKey: cryptoService.rsaWrapKey(r.rsaPublicKey, aesKey),
+      status: 'pending',
+    }))
+  );
 
   return { document, aesKey };
 }
@@ -101,7 +102,7 @@ async function encryptAndStore({ pdfBytes, filename, classification, description
 // Simulates a real recipient decrypting a document, so the demo ledger contains
 // genuine, independently-verifiable signed entries (not fabricated placeholders).
 async function simulateDecryption(document, recipient, deviceLabel) {
-  const assignment = document.recipients.find((r) => String(r.recipient) === String(recipient._id));
+  const assignment = await DocumentRecipient.findOne({ where: { documentId: document.id, recipientId: recipient.id } });
   const aesKey = cryptoService.rsaUnwrapKey(recipient.rsaPrivateKey, assignment.encryptedAESKey);
   const encryptedData = fs.readFileSync(document.encryptedPath);
   const plaintext = cryptoService.aesDecrypt({
@@ -114,9 +115,9 @@ async function simulateDecryption(document, recipient, deviceLabel) {
   const deviceId = `DEV-${cryptoService.sha256Hex(deviceLabel).slice(0, 16).toUpperCase()}`;
 
   const token = attributionService.createAttributionToken({
-    recipientId: recipient._id,
+    recipientId: recipient.id,
     employeeId: recipient.employeeId,
-    documentId: document._id,
+    documentId: document.id,
     documentHash: document.hash,
     deviceId,
     edPrivateKey: recipient.edPrivateKey,
@@ -125,8 +126,8 @@ async function simulateDecryption(document, recipient, deviceLabel) {
   await pdfService.embedHiddenMetadata(plaintext, token); // validated for correctness, output not persisted in seed
 
   await ledgerService.appendEntry({
-    recipientId: recipient._id,
-    documentId: document._id,
+    recipientId: recipient.id,
+    documentId: document.id,
     tokenId: token.tokenId,
     documentHash: document.hash,
     deviceId,
@@ -138,7 +139,7 @@ async function simulateDecryption(document, recipient, deviceLabel) {
 
   assignment.status = 'decrypted';
   assignment.decryptedAt = new Date();
-  await document.save();
+  await assignment.save();
 
   return token;
 }
@@ -146,8 +147,11 @@ async function simulateDecryption(document, recipient, deviceLabel) {
 async function main() {
   await connectDB();
 
-  console.log('[SEED] Clearing existing data...');
-  await Promise.all([User.deleteMany({}), Document.deleteMany({}), Ledger.deleteMany({})]);
+  console.log('[SEED] Dropping and recreating tables (users, documents, document_recipients, ledger_entries)...');
+  // force: true drops each table and recreates it from the current model
+  // definitions — the Postgres equivalent of the old deleteMany({}) sweep,
+  // and also what actually creates the schema on a brand-new database.
+  await sequelize.sync({ force: true });
   fs.readdirSync(ENCRYPTED_DIR).forEach((f) => fs.unlinkSync(path.join(ENCRYPTED_DIR, f)));
   if (fs.existsSync(ledgerService.LEDGER_JSON_PATH)) fs.unlinkSync(ledgerService.LEDGER_JSON_PATH);
 

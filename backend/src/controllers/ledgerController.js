@@ -1,4 +1,5 @@
-const Ledger = require('../models/Ledger');
+const { Op } = require('sequelize');
+const { Ledger, User, Document } = require('../models');
 const ledgerService = require('../services/ledgerService');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -8,34 +9,36 @@ const getLedger = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
   const { search, recipientId, documentId, from, to } = req.query;
 
-  const filter = {};
-  if (recipientId) filter.recipientId = recipientId;
-  if (documentId) filter.documentId = documentId;
+  const where = {};
+  if (recipientId) where.recipientId = recipientId;
+  if (documentId) where.documentId = documentId;
   if (from || to) {
-    filter.timestamp = {};
-    if (from) filter.timestamp.$gte = new Date(from);
-    if (to) filter.timestamp.$lte = new Date(to);
+    where.timestamp = {};
+    if (from) where.timestamp[Op.gte] = new Date(from);
+    if (to) where.timestamp[Op.lte] = new Date(to);
   }
 
   // Fetch full verification once so per-entry chain status can be attached below.
   const verification = await ledgerService.verifyChain();
   const validityByToken = new Map(verification.report.map((r) => [r.tokenId, r.valid]));
 
-  let entriesQuery = Ledger.find(filter)
-    .sort({ sequence: -1 })
-    .populate('recipientId', 'employeeId name')
-    .populate('documentId', 'originalName classification hash');
-
-  let entries = await entriesQuery;
+  let entries = await Ledger.findAll({
+    where,
+    order: [['sequence', 'DESC']],
+    include: [
+      { model: User, as: 'recipient', attributes: ['id', 'employeeId', 'name'] },
+      { model: Document, as: 'document', attributes: ['id', 'originalName', 'classification', 'hash'] },
+    ],
+  });
 
   if (search) {
     const term = search.toLowerCase();
     entries = entries.filter((e) => {
       return (
         e.tokenId?.toLowerCase().includes(term) ||
-        e.recipientId?.employeeId?.toLowerCase().includes(term) ||
-        e.recipientId?.name?.toLowerCase().includes(term) ||
-        e.documentId?.originalName?.toLowerCase().includes(term) ||
+        e.recipient?.employeeId?.toLowerCase().includes(term) ||
+        e.recipient?.name?.toLowerCase().includes(term) ||
+        e.document?.originalName?.toLowerCase().includes(term) ||
         e.deviceId?.toLowerCase().includes(term)
       );
     });
@@ -55,8 +58,8 @@ const getLedger = asyncHandler(async (req, res) => {
       previousHash: e.previousHash,
       currentHash: e.currentHash,
       tokenId: e.tokenId,
-      recipient: e.recipientId ? { id: e.recipientId._id, employeeId: e.recipientId.employeeId, name: e.recipientId.name } : null,
-      document: e.documentId ? { id: e.documentId._id, name: e.documentId.originalName, classification: e.documentId.classification } : null,
+      recipient: e.recipient ? { id: e.recipient.id, employeeId: e.recipient.employeeId, name: e.recipient.name } : null,
+      document: e.document ? { id: e.document.id, name: e.document.originalName, classification: e.document.classification } : null,
       documentHash: e.documentHash,
       deviceId: e.deviceId,
       nonce: e.nonce,

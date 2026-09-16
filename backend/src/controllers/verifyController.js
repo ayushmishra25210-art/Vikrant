@@ -1,7 +1,5 @@
 const fs = require('fs');
-const Document = require('../models/Document');
-const Ledger = require('../models/Ledger');
-const User = require('../models/User');
+const { Document, Ledger, User } = require('../models');
 const pdfService = require('../services/pdfService');
 const attributionService = require('../services/attributionService');
 const ledgerService = require('../services/ledgerService');
@@ -47,7 +45,7 @@ const verifyLeak = asyncHandler(async (req, res) => {
   token = extraction.payload;
 
   // Step 2: Verify Signature — the token must validate against the claimed recipient's Ed25519 public key
-  const claimedRecipient = await User.findById(token.recipientId);
+  const claimedRecipient = await User.findByPk(token.recipientId);
   let signatureValid = false;
   if (claimedRecipient) {
     const verification = attributionService.verifyAttributionToken(token, claimedRecipient.edPublicKey);
@@ -62,7 +60,7 @@ const verifyLeak = asyncHandler(async (req, res) => {
   });
 
   // Step 3: Compare Hash — the document hash embedded in the token must match the original on file
-  const document = await Document.findById(token.documentId);
+  const document = await Document.findByPk(token.documentId);
   const hashMatches = Boolean(document && document.hash === token.documentHash);
   steps.push({
     step: 'Compare Hash',
@@ -73,7 +71,10 @@ const verifyLeak = asyncHandler(async (req, res) => {
   });
 
   // Step 4: Verify Ledger — an immutable, chain-verified ledger entry must exist for this token
-  const ledgerEntry = await Ledger.findOne({ tokenId: token.tokenId }).populate('recipientId', 'employeeId name department');
+  const ledgerEntry = await Ledger.findOne({
+    where: { tokenId: token.tokenId },
+    include: [{ model: User, as: 'recipient', attributes: ['id', 'employeeId', 'name', 'department'] }],
+  });
   const chainVerification = await ledgerService.verifyChain();
   const entryInChain = chainVerification.report.find((r) => r.tokenId === token.tokenId);
   const ledgerOk = Boolean(ledgerEntry && entryInChain && entryInChain.valid);
@@ -86,12 +87,12 @@ const verifyLeak = asyncHandler(async (req, res) => {
   });
 
   // Step 5: Recipient Identified
-  if (ledgerOk && ledgerEntry.recipientId) {
+  if (ledgerOk && ledgerEntry.recipient) {
     identifiedRecipient = {
-      id: ledgerEntry.recipientId._id,
-      employeeId: ledgerEntry.recipientId.employeeId,
-      name: ledgerEntry.recipientId.name,
-      department: ledgerEntry.recipientId.department,
+      id: ledgerEntry.recipient.id,
+      employeeId: ledgerEntry.recipient.employeeId,
+      name: ledgerEntry.recipient.name,
+      department: ledgerEntry.recipient.department,
       deviceId: ledgerEntry.deviceId,
       decryptedAt: ledgerEntry.timestamp,
       tokenId: token.tokenId,
@@ -111,7 +112,7 @@ const verifyLeak = asyncHandler(async (req, res) => {
 
   res.json({
     leakedFileHash,
-    document: document ? { id: document._id, name: document.originalName, classification: document.classification } : null,
+    document: document ? { id: document.id, name: document.originalName, classification: document.classification } : null,
     steps,
     chainValid: chainVerification.valid,
     identifiedRecipient,

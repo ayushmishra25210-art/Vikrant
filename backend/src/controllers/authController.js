@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { User } = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 
 const login = asyncHandler(async (req, res) => {
@@ -9,7 +9,7 @@ const login = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Employee ID and password are required.' });
   }
 
-  const user = await User.findOne({ employeeId: employeeId.trim().toUpperCase() });
+  const user = await User.findOne({ where: { employeeId: employeeId.trim().toUpperCase() } });
   if (!user) {
     return res.status(401).json({ message: 'Invalid Employee ID or password.' });
   }
@@ -22,7 +22,7 @@ const login = asyncHandler(async (req, res) => {
   user.lastLoginAt = new Date();
   await user.save();
 
-  const token = jwt.sign({ sub: user._id.toString(), role: user.role, employeeId: user.employeeId }, process.env.JWT_SECRET, {
+  const token = jwt.sign({ sub: user.id, role: user.role, employeeId: user.employeeId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
   });
 

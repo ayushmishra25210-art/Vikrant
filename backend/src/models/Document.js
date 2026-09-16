@@ -1,46 +1,40 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const recipientAssignmentSchema = new mongoose.Schema(
+const Document = sequelize.define(
+  'Document',
   {
-    recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    // AES-256 content key, RSA-OAEP-4096 encrypted with this recipient's public key (base64)
-    encryptedAESKey: { type: String, required: true },
-    status: { type: String, enum: ['pending', 'decrypted'], default: 'pending' },
-    decryptedAt: { type: Date },
-    assignedAt: { type: Date, default: Date.now },
-  },
-  { _id: false }
-);
-
-const documentSchema = new mongoose.Schema(
-  {
-    filename: { type: String, required: true },
-    originalName: { type: String, required: true },
-    description: { type: String, default: '' },
-    classification: {
-      type: String,
-      enum: ['UNCLASSIFIED', 'RESTRICTED', 'CONFIDENTIAL', 'SECRET'],
-      default: 'CONFIDENTIAL',
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
     },
-    uploader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    filename: { type: DataTypes.STRING, allowNull: false },
+    originalName: { type: DataTypes.STRING, allowNull: false, field: 'original_name' },
+    description: { type: DataTypes.TEXT, defaultValue: '' },
+    classification: {
+      type: DataTypes.ENUM('UNCLASSIFIED', 'RESTRICTED', 'CONFIDENTIAL', 'SECRET'),
+      defaultValue: 'CONFIDENTIAL',
+    },
+    uploaderId: { type: DataTypes.UUID, allowNull: false, field: 'uploader_id' },
 
     // SHA-256 hash of the ORIGINAL plaintext PDF (pre-encryption). Used for leak matching later.
-    hash: { type: String, required: true },
-    fileSize: { type: Number, required: true },
+    hash: { type: DataTypes.STRING, allowNull: false },
+    fileSize: { type: DataTypes.BIGINT, allowNull: false, field: 'file_size' },
 
-    encryptedPath: { type: String, required: true },
-    iv: { type: String, required: true }, // AES-GCM IV, base64
-    authTag: { type: String, required: true }, // AES-GCM auth tag, base64
+    encryptedPath: { type: DataTypes.STRING, allowNull: false, field: 'encrypted_path' },
+    iv: { type: DataTypes.STRING, allowNull: false }, // AES-GCM IV, base64
+    authTag: { type: DataTypes.STRING, allowNull: false, field: 'auth_tag' }, // AES-GCM auth tag, base64
 
     // AES content key, RSA-wrapped with the UPLOADER's own public key. Lets the
     // admin assign additional recipients later without re-uploading the file.
-    adminEncryptedAESKey: { type: String, required: true },
+    adminEncryptedAESKey: { type: DataTypes.TEXT, allowNull: false, field: 'admin_encrypted_aes_key' },
 
-    recipients: [recipientAssignmentSchema],
-
-    uploadTime: { type: Date, default: Date.now },
+    uploadTime: { type: DataTypes.DATE, defaultValue: DataTypes.NOW, field: 'upload_time' },
   },
-  { timestamps: true }
+  {
+    tableName: 'documents',
+  }
 );
 
-module.exports = mongoose.model('Document', documentSchema);
+module.exports = Document;

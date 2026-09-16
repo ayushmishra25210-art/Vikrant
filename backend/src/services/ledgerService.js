@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const Ledger = require('../models/Ledger');
+const { Ledger } = require('../models');
 const { sha256Hex, ed25519Sign, ed25519Verify } = require('./cryptoService');
 const { LEDGER_GENESIS_SEED } = require('../config/constants');
 
@@ -25,7 +25,7 @@ async function getGenesisHash() {
 }
 
 async function getLastEntry() {
-  return Ledger.findOne().sort({ sequence: -1 });
+  return Ledger.findOne({ order: [['sequence', 'DESC']] });
 }
 
 /**
@@ -74,7 +74,7 @@ async function appendEntry({ recipientId, documentId, tokenId, documentHash, dev
 }
 
 async function mirrorToJsonFile() {
-  const entries = await Ledger.find().sort({ sequence: 1 }).lean();
+  const entries = await Ledger.findAll({ order: [['sequence', 'ASC']], raw: true });
   const serializable = entries.map((e) => ({
     sequence: e.sequence,
     previousHash: e.previousHash,
@@ -101,7 +101,7 @@ async function mirrorToJsonFile() {
  * broken record invalidates the chain from that point forward.
  */
 async function verifyChain() {
-  const entries = await Ledger.find().sort({ sequence: 1 }).lean();
+  const entries = await Ledger.findAll({ order: [['sequence', 'ASC']], raw: true });
   const genesisHash = await getGenesisHash();
   let expectedPrevious = genesisHash;
   const report = [];

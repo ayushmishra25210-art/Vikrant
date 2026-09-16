@@ -1,30 +1,47 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const userSchema = new mongoose.Schema(
+const User = sequelize.define(
+  'User',
   {
-    employeeId: { type: String, required: true, unique: true, uppercase: true, trim: true },
-    name: { type: String, required: true, trim: true },
-    designation: { type: String, default: '' },
-    department: { type: String, default: 'National Informatics Centre' },
-    role: { type: String, enum: ['admin', 'recipient'], required: true },
-    passwordHash: { type: String, required: true },
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    employeeId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      field: 'employee_id',
+      set(value) {
+        this.setDataValue('employeeId', String(value).trim().toUpperCase());
+      },
+    },
+    name: { type: DataTypes.STRING, allowNull: false },
+    designation: { type: DataTypes.STRING, defaultValue: '' },
+    department: { type: DataTypes.STRING, defaultValue: 'National Informatics Centre' },
+    role: { type: DataTypes.ENUM('admin', 'recipient'), allowNull: false },
+    passwordHash: { type: DataTypes.STRING, allowNull: false, field: 'password_hash' },
 
     // RSA-4096 keypair — used to wrap/unwrap the per-document AES-256 key for this user.
-    rsaPublicKey: { type: String, required: true },
-    rsaPrivateKey: { type: String, required: true }, // demo only: normally held client-side / in an HSM
+    rsaPublicKey: { type: DataTypes.TEXT, allowNull: false, field: 'rsa_public_key' },
+    rsaPrivateKey: { type: DataTypes.TEXT, allowNull: false, field: 'rsa_private_key' }, // demo only: normally held client-side / in an HSM
 
     // Ed25519 keypair — used to sign attribution tokens and ledger entries.
-    edPublicKey: { type: String, required: true },
-    edPrivateKey: { type: String, required: true }, // demo only
+    edPublicKey: { type: DataTypes.TEXT, allowNull: false, field: 'ed_public_key' },
+    edPrivateKey: { type: DataTypes.TEXT, allowNull: false, field: 'ed_private_key' }, // demo only
 
-    lastLoginAt: { type: Date },
+    lastLoginAt: { type: DataTypes.DATE, field: 'last_login_at' },
   },
-  { timestamps: true }
+  {
+    tableName: 'users',
+  }
 );
 
-userSchema.methods.toSafeJSON = function toSafeJSON() {
+User.prototype.toSafeJSON = function toSafeJSON() {
   return {
-    id: this._id,
+    id: this.id,
     employeeId: this.employeeId,
     name: this.name,
     designation: this.designation,
@@ -37,4 +54,4 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
   };
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = User;

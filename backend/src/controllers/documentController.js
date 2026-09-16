@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const Document = require('../models/Document');
-const User = require('../models/User');
+const { Op } = require('sequelize');
+const { Document, User, DocumentRecipient, Ledger } = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 const cryptoService = require('../services/cryptoService');
 const pdfService = require('../services/pdfService');
@@ -12,6 +12,17 @@ const { deriveDeviceId } = require('../utils/deviceId');
 
 const ENCRYPTED_DIR = path.join(__dirname, '..', '..', 'uploads', 'encrypted');
 if (!fs.existsSync(ENCRYPTED_DIR)) fs.mkdirSync(ENCRYPTED_DIR, { recursive: true });
+
+// Shared eager-load shape: uploader + each recipient assignment row with its User.
+// Replaces Mongoose's .populate('uploader') / .populate('recipients.recipient').
+const DOCUMENT_INCLUDES = [
+  { model: User, as: 'uploader', attributes: ['id', 'employeeId', 'name'] },
+  {
+    model: DocumentRecipient,
+    as: 'recipients',
+    include: [{ model: User, as: 'recipient', attributes: ['id', 'employeeId', 'name'] }],
+  },
+];
 
 // POST /documents/upload  (admin only, multipart/form-data: file, classification, description, recipients[])
 const uploadDocument = asyncHandler(async (req, res) => {
@@ -51,32 +62,36 @@ const uploadDocument = asyncHandler(async (req, res) => {
   const uploader = req.user;
   const adminEncryptedAESKey = cryptoService.rsaWrapKey(uploader.rsaPublicKey, aesKey);
 
-  const recipientDocs = recipientEmployeeIds.length
-    ? await User.find({ employeeId: { $in: recipientEmployeeIds.map((e) => e.toUpperCase()) }, role: 'recipient' })
+  const recipientUsers = recipientEmployeeIds.length
+    ? await User.findAll({ where: { employeeId: { [Op.in]: recipientEmployeeIds.map((e) => e.toUpperCase()) }, role: 'recipient' } })
     : [];
-
-  const recipients = recipientDocs.map((r) => ({
-    recipient: r._id,
-    encryptedAESKey: cryptoService.rsaWrapKey(r.rsaPublicKey, aesKey),
-    status: 'pending',
-  }));
 
   const document = await Document.create({
     filename: encryptedFilename,
     originalName: req.file.originalname,
     description: description || '',
     classification: classification || 'CONFIDENTIAL',
-    uploader: uploader._id,
+    uploaderId: uploader.id,
     hash,
     fileSize: plaintext.length,
     encryptedPath,
     iv: iv.toString('base64'),
     authTag: authTag.toString('base64'),
-    recipients,
     adminEncryptedAESKey,
   });
 
-  const populated = await Document.findById(document._id).populate('recipients.recipient', 'employeeId name');
+  if (recipientUsers.length) {
+    await DocumentRecipient.bulkCreate(
+      recipientUsers.map((r) => ({
+        documentId: document.id,
+        recipientId: r.id,
+        encryptedAESKey: cryptoService.rsaWrapKey(r.rsaPublicKey, aesKey),
+        status: 'pending',
+      }))
+    );
+  }
+
+  const populated = await Document.findByPk(document.id, { include: DOCUMENT_INCLUDES });
 
   res.status(201).json({ message: 'Document encrypted and stored successfully.', document: serializeDocument(populated) });
 });
@@ -89,54 +104,51 @@ const assignRecipients = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'recipientIds (array of employee IDs) is required.' });
   }
 
-  const document = await Document.findById(id);
+  const document = await Document.findByPk(id);
   if (!document) return res.status(404).json({ message: 'Document not found.' });
 
-  const uploader = await User.findById(document.uploader);
+  const uploader = await User.findByPk(document.uploaderId);
   const aesKey = cryptoService.rsaUnwrapKey(uploader.rsaPrivateKey, document.adminEncryptedAESKey);
 
-  const users = await User.find({ employeeId: { $in: recipientIds.map((e) => e.toUpperCase()) }, role: 'recipient' });
-  const alreadyAssigned = new Set(document.recipients.map((r) => String(r.recipient)));
+  const users = await User.findAll({ where: { employeeId: { [Op.in]: recipientIds.map((e) => e.toUpperCase()) }, role: 'recipient' } });
+  const existingAssignments = await DocumentRecipient.findAll({ where: { documentId: document.id } });
+  const alreadyAssigned = new Set(existingAssignments.map((r) => r.recipientId));
 
-  let added = 0;
+  const newRows = [];
   for (const user of users) {
-    if (alreadyAssigned.has(String(user._id))) continue;
-    document.recipients.push({
-      recipient: user._id,
+    if (alreadyAssigned.has(user.id)) continue;
+    newRows.push({
+      documentId: document.id,
+      recipientId: user.id,
       encryptedAESKey: cryptoService.rsaWrapKey(user.rsaPublicKey, aesKey),
       status: 'pending',
     });
-    added += 1;
   }
+  if (newRows.length) await DocumentRecipient.bulkCreate(newRows);
 
-  await document.save();
-  const populated = await Document.findById(document._id).populate('recipients.recipient', 'employeeId name');
-  res.json({ message: `${added} recipient(s) assigned.`, document: serializeDocument(populated) });
+  const populated = await Document.findByPk(document.id, { include: DOCUMENT_INCLUDES });
+  res.json({ message: `${newRows.length} recipient(s) assigned.`, document: serializeDocument(populated) });
 });
 
 // GET /documents  — admin: all documents. recipient: only documents assigned to them.
 const listDocuments = asyncHandler(async (req, res) => {
-  let query = {};
+  let where = {};
   if (req.user.role === 'recipient') {
-    query = { 'recipients.recipient': req.user._id };
+    const assignments = await DocumentRecipient.findAll({ where: { recipientId: req.user.id }, attributes: ['documentId'] });
+    where = { id: { [Op.in]: assignments.map((a) => a.documentId) } };
   }
-  const documents = await Document.find(query)
-    .sort({ createdAt: -1 })
-    .populate('uploader', 'employeeId name')
-    .populate('recipients.recipient', 'employeeId name');
+  const documents = await Document.findAll({ where, include: DOCUMENT_INCLUDES, order: [['createdAt', 'DESC']] });
 
   res.json({ documents: documents.map((d) => serializeDocument(d, req.user)) });
 });
 
 // GET /documents/:id
 const getDocument = asyncHandler(async (req, res) => {
-  const document = await Document.findById(req.params.id)
-    .populate('uploader', 'employeeId name')
-    .populate('recipients.recipient', 'employeeId name');
+  const document = await Document.findByPk(req.params.id, { include: DOCUMENT_INCLUDES });
   if (!document) return res.status(404).json({ message: 'Document not found.' });
 
   if (req.user.role === 'recipient') {
-    const isAssigned = document.recipients.some((r) => String(r.recipient._id) === String(req.user._id));
+    const isAssigned = document.recipients.some((r) => r.recipientId === req.user.id);
     if (!isAssigned) return res.status(403).json({ message: 'You are not assigned to this document.' });
   }
 
@@ -146,10 +158,10 @@ const getDocument = asyncHandler(async (req, res) => {
 // POST /documents/:id/decrypt  (recipient only)
 // Performs the full decrypt -> attribute -> embed -> ledger -> return-PDF workflow.
 const decryptDocument = asyncHandler(async (req, res) => {
-  const document = await Document.findById(req.params.id);
+  const document = await Document.findByPk(req.params.id);
   if (!document) return res.status(404).json({ message: 'Document not found.' });
 
-  const assignment = document.recipients.find((r) => String(r.recipient) === String(req.user._id));
+  const assignment = await DocumentRecipient.findOne({ where: { documentId: document.id, recipientId: req.user.id } });
   if (!assignment) {
     return res.status(403).json({ message: 'You are not an authorized recipient of this document.' });
   }
@@ -178,9 +190,9 @@ const decryptDocument = asyncHandler(async (req, res) => {
 
   // 5. Generate + sign the cryptographic attribution token
   const token = attributionService.createAttributionToken({
-    recipientId: recipient._id,
+    recipientId: recipient.id,
     employeeId: recipient.employeeId,
-    documentId: document._id,
+    documentId: document.id,
     documentHash: document.hash,
     deviceId,
     edPrivateKey: recipient.edPrivateKey,
@@ -191,8 +203,8 @@ const decryptDocument = asyncHandler(async (req, res) => {
 
   // 7. Append an immutable, chained + signed provenance ledger entry
   const ledgerEntry = await ledgerService.appendEntry({
-    recipientId: recipient._id,
-    documentId: document._id,
+    recipientId: recipient.id,
+    documentId: document.id,
     tokenId: token.tokenId,
     documentHash: document.hash,
     deviceId,
@@ -204,7 +216,7 @@ const decryptDocument = asyncHandler(async (req, res) => {
 
   assignment.status = 'decrypted';
   assignment.decryptedAt = new Date();
-  await document.save();
+  await assignment.save();
 
   res.set({
     'Content-Type': 'application/pdf',
@@ -220,18 +232,21 @@ const decryptDocument = asyncHandler(async (req, res) => {
 
 // GET /document/:id/provenance — full decryption/attribution history for one document
 const getDocumentProvenance = asyncHandler(async (req, res) => {
-  const Ledger = require('../models/Ledger');
-  const document = await Document.findById(req.params.id).populate('recipients.recipient', 'employeeId name');
+  const document = await Document.findByPk(req.params.id, { include: DOCUMENT_INCLUDES });
   if (!document) return res.status(404).json({ message: 'Document not found.' });
 
-  const entries = await Ledger.find({ documentId: document._id }).sort({ sequence: 1 }).populate('recipientId', 'employeeId name');
+  const entries = await Ledger.findAll({
+    where: { documentId: document.id },
+    order: [['sequence', 'ASC']],
+    include: [{ model: User, as: 'recipient', attributes: ['id', 'employeeId', 'name'] }],
+  });
 
   res.json({
-    document: { id: document._id, name: document.originalName, hash: document.hash, classification: document.classification },
+    document: { id: document.id, name: document.originalName, hash: document.hash, classification: document.classification },
     provenance: entries.map((e) => ({
       sequence: e.sequence,
       tokenId: e.tokenId,
-      recipient: e.recipientId ? { id: e.recipientId._id, employeeId: e.recipientId.employeeId, name: e.recipientId.name } : null,
+      recipient: e.recipient ? { id: e.recipient.id, employeeId: e.recipient.employeeId, name: e.recipient.name } : null,
       deviceId: e.deviceId,
       timestamp: e.timestamp,
       previousHash: e.previousHash,
@@ -243,16 +258,16 @@ const getDocumentProvenance = asyncHandler(async (req, res) => {
 
 function serializeDocument(doc, requestingUser) {
   const obj = {
-    id: doc._id,
+    id: doc.id,
     filename: doc.originalName,
     description: doc.description,
     classification: doc.classification,
     hash: doc.hash,
     fileSize: doc.fileSize,
-    uploader: doc.uploader ? { id: doc.uploader._id, employeeId: doc.uploader.employeeId, name: doc.uploader.name } : null,
+    uploader: doc.uploader ? { id: doc.uploader.id, employeeId: doc.uploader.employeeId, name: doc.uploader.name } : null,
     uploadTime: doc.uploadTime,
     recipients: doc.recipients.map((r) => ({
-      id: r.recipient?._id,
+      id: r.recipient?.id,
       employeeId: r.recipient?.employeeId,
       name: r.recipient?.name,
       status: r.status,
@@ -260,7 +275,7 @@ function serializeDocument(doc, requestingUser) {
     })),
   };
   if (requestingUser && requestingUser.role === 'recipient') {
-    const mine = doc.recipients.find((r) => String(r.recipient?._id || r.recipient) === String(requestingUser._id));
+    const mine = doc.recipients.find((r) => r.recipientId === requestingUser.id);
     obj.myStatus = mine ? mine.status : null;
   }
   return obj;
