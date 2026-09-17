@@ -47,7 +47,7 @@ export default function LoginPage() {
         <img src="/emblem.svg" alt="Government of India" className="w-8 h-8" />
         <div>
           <p className="text-[14px] font-semibold">Government of India</p>
-          <p className="text-[11px] text-navy-100 opacity-85">National Informatics Centre &middot; e-Prahari Portal</p>
+          <p className="text-[11px] text-navy-100 opacity-85">National Informatics Centre &middot; Vikrant Portal</p>
         </div>
       </header>
 
@@ -57,7 +57,7 @@ export default function LoginPage() {
             <div className="md:col-span-2 bg-navy-700 text-white p-8 flex flex-col justify-between">
               <div>
                 <img src="/emblem.svg" alt="" className="w-14 h-14 mb-5" />
-                <h1 className="text-[22px] font-semibold leading-snug">e-Prahari</h1>
+                <h1 className="text-[22px] font-semibold leading-snug">Vikrant</h1>
                 <p className="text-[13px] text-navy-100 opacity-90 mt-1">
                   Cryptographic Attribution and Immutable Decryption Provenance System for Multi-Recipient Encrypted Document Distribution
                 </p>

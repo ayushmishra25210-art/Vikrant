@@ -21,7 +21,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
         </main>
       </div>
       <footer className="border-t border-gray-200 bg-white text-center py-3 text-[11.5px] text-gray-500">
-        e-Prahari &middot; Smart India Hackathon Prototype &middot; Ministry of Electronics &amp; Information Technology (Demonstration Build)
+        Vikrant &middot; Smart India Hackathon Prototype &middot; Ministry of Electronics &amp; Information Technology (Demonstration Build)
       </footer>
     </div>
   );

@@ -13,7 +13,7 @@ export default function GovNavbar() {
         <div className="flex items-center gap-3">
           <img src="/emblem.svg" alt="Government of India" className="w-9 h-9" />
           <div className="leading-tight">
-            <p className="text-[15px] font-semibold tracking-wide">e-Prahari</p>
+            <p className="text-[15px] font-semibold tracking-wide">Vikrant</p>
             <p className="text-[11px] text-navy-100 opacity-85">Cryptographic Attribution &amp; Document Provenance System</p>
           </div>
         </div>

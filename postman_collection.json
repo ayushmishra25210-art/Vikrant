@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "e-Prahari - Cryptographic Attribution & Provenance API",
+    "name": "Vikrant - Cryptographic Attribution & Provenance API",
     "description": "Postman collection for the SIH prototype: Cryptographic Attribution and Immutable Decryption Provenance for Multi-Recipient Encrypted Document Distribution.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

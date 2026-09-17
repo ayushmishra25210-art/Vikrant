@@ -1,4 +1,4 @@
-# e-Prahari — Cryptographic Attribution & Immutable Decryption Provenance
+# Vikrant — Cryptographic Attribution & Immutable Decryption Provenance
 
 **Smart India Hackathon Prototype**
 *Cryptographic Attribution and Immutable Decryption Provenance for Multi-Recipient Encrypted Document Distribution*
