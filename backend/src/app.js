@@ -11,14 +11,17 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// Accept any localhost/127.0.0.1 origin regardless of port, PLUS whatever
-// FRONTEND_ORIGIN is set to (for a real, non-local deployment). Vite
-// auto-increments to the next free port (5174, 5175, ...) whenever 5173 is
-// already taken by another running instance, so pinning CORS to one exact
-// localhost origin is brittle in local dev — a mismatched port here silently
-// blocks every API call, and the only symptom is a generic "network error"
-// with no useful message in the browser.
+// Accept any localhost/127.0.0.1 origin regardless of port, PLUS any
+// *.vercel.app deployment (Vercel assigns an unpredictable subdomain per
+// preview build, so there's no single fixed URL to pin to), PLUS whatever
+// FRONTEND_ORIGIN is explicitly set to. Vite also auto-increments to the
+// next free port (5174, 5175, ...) whenever 5173 is already taken by another
+// running instance, so pinning CORS to one exact localhost origin is brittle
+// in local dev — a mismatched port here silently blocks every API call, and
+// the only symptom is a generic "network error" with no useful message in
+// the browser.
 const LOCALHOST_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const VERCEL_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
 
 app.use(
   cors({
@@ -26,6 +29,7 @@ app.use(
       const isAllowed =
         !origin || // curl, same-origin, server-to-server — no Origin header at all
         LOCALHOST_ORIGIN_PATTERN.test(origin) ||
+        VERCEL_ORIGIN_PATTERN.test(origin) ||
         origin === process.env.FRONTEND_ORIGIN;
       callback(null, isAllowed);
     },

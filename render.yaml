@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: sih-crypto-provenance-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sih-crypto-provenance-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: LEDGER_GENESIS_SEED
+        value: SIH-CRYPTO-PROVENANCE-GENESIS-BLOCK
+      - key: LEDGER_SIGNING_PASSPHRASE
+        generateValue: true
+      # Set this to your deployed Vercel URL once you have it (e.g.
+      # https://your-project.vercel.app) — any *.vercel.app origin is already
+      # allowed by default (see backend/src/app.js), so this is only needed
+      # if you put the frontend on a custom domain instead.
+      - key: FRONTEND_ORIGIN
+        value: https://your-project.vercel.app
+      # Wipes and repopulates demo data (1 admin, 3 recipients, 5 documents,
+      # sample ledger entries) on every boot while true. Leave it on for the
+      # first deploy, then edit this to "false" in the Render dashboard
+      # afterwards — otherwise every restart (including a free-tier
+      # spin-down/up cycle) resets anything done during a live demo.
+      - key: SEED_ON_BOOT
+        value: 'true'
+
+databases:
+  - name: sih-crypto-provenance-db
+    plan: free

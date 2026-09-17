@@ -198,7 +198,52 @@ VITE_API_BASE_URL=http://localhost:5050/api
 
 ---
 
-## 9. Known Limitations (demo scope, disclosed honestly)
+## 9. Deployment (Vercel + Render)
+
+Frontend on Vercel, backend + Postgres on Render. Both platforms deploy from a GitHub repo, so push this project to
+GitHub first (`git remote add origin <your-repo-url> && git push -u origin main`).
+
+### Backend + database (Render)
+
+This repo includes [`render.yaml`](render.yaml), a Render **Blueprint** — it creates the web service and a Postgres
+database together in one step:
+
+1. Go to the Render dashboard → **New** → **Blueprint** → connect this GitHub repo. Render reads `render.yaml`
+   automatically and shows you the backend service + `sih-crypto-provenance-db` Postgres instance it's about to
+   create.
+2. Click **Apply**. Render provisions the database, wires its connection string into the backend's `DATABASE_URL`
+   automatically, and generates random values for `JWT_SECRET` / `LEDGER_SIGNING_PASSPHRASE`.
+3. First deploy runs with `SEED_ON_BOOT=true`, so it seeds the demo data (1 admin, 3 recipients, 5 documents, sample
+   ledger) automatically — no shell access needed. **After the first successful deploy, go to the service's
+   Environment tab and set `SEED_ON_BOOT` to `false`**, then save (this redeploys once more). Leaving it `true` would
+   wipe the ledger/documents back to the seed state on every restart, including a free-tier spin-down/up cycle.
+4. Note the backend's public URL (e.g. `https://sih-crypto-provenance-backend.onrender.com`) — the frontend needs it
+   next.
+
+### Frontend (Vercel)
+
+1. Go to the Vercel dashboard → **Add New** → **Project** → import this GitHub repo.
+2. Set **Root Directory** to `frontend`. Vercel auto-detects the Vite framework preset (build command
+   `npm run build`, output directory `dist`) — a [`vercel.json`](frontend/vercel.json) in this repo also adds the SPA
+   rewrite rule React Router needs so refreshing a route like `/admin/dashboard` doesn't 404.
+3. Add an environment variable: `VITE_API_BASE_URL` = `https://<your-render-backend-url>/api` (the URL from the
+   Render step above, with `/api` appended). Vite bakes this in at build time, so it must be set *before* deploying.
+4. Deploy. Any `https://*.vercel.app` origin — including preview deployments — is already allowed by the backend's
+   CORS policy by default (see `backend/src/app.js`), so no extra CORS configuration is needed unless you attach a
+   custom domain, in which case set that domain as `FRONTEND_ORIGIN` on the Render service.
+
+### Known limitation of this hosting setup
+
+Uploaded/encrypted files are written to local disk (`backend/uploads/encrypted/`), not object storage. Render's free
+web service tier has **ephemeral disk** — a redeploy, or a free-tier spin-down after 15 minutes of inactivity followed
+by spin-up, wipes anything written to disk since the last deploy. For a live, actively-driven demo session this won't
+matter; if the service spins down mid-demo, encrypted files created since the last deploy are lost and decrypting
+those specific documents will fail (re-running the seed, or upgrading to a paid instance / adding S3-compatible
+storage, resolves this — out of scope for the hackathon MVP).
+
+---
+
+## 10. Known Limitations (demo scope, disclosed honestly)
 
 - Private keys (RSA + Ed25519) are stored server-side in PostgreSQL for demonstration purposes so the API can act on
   a recipient's behalf without a client-side key-management flow. A production system would generate/store private
@@ -209,7 +254,7 @@ VITE_API_BASE_URL=http://localhost:5050/api
 
 ---
 
-## 10. Tech Stack
+## 11. Tech Stack
 
 **Frontend:** React 18 (Vite), Tailwind CSS, React Router, Axios, Lucide Icons
 **Backend:** Node.js, Express.js, PostgreSQL, Sequelize, JWT, Multer, Node `crypto`, `pdf-lib`, dotenv, CORS

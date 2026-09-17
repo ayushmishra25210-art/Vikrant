@@ -281,11 +281,20 @@ async function main() {
   console.log(` Recipient  : EMP102 / ${RECIPIENT_PASSWORD}  (Vikram Singh Rathore)`);
   console.log(` Recipient  : EMP103 / ${RECIPIENT_PASSWORD}  (Priya Nair)`);
   console.log('=================================================================\n');
-
-  process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('[SEED] Failed:', err);
-  process.exit(1);
-});
+module.exports = { run: main };
+
+// Only auto-run + exit the process when this file is executed directly
+// (`npm run seed`). When required as a module instead (e.g. server.js
+// optionally seeding on boot on a host with no interactive shell), the
+// caller owns the process lifecycle — calling process.exit(0) here would
+// kill the web server right after it finished booting.
+if (require.main === module) {
+  main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('[SEED] Failed:', err);
+      process.exit(1);
+    });
+}
