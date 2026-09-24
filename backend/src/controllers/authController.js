@@ -4,12 +4,18 @@ const { User } = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 
 const login = asyncHandler(async (req, res) => {
-  const { employeeId, password } = req.body;
-  if (!employeeId || !password) {
-    return res.status(400).json({ message: 'Employee ID and password are required.' });
+  const { employeeId, phoneNumber, password } = req.body;
+  if (!employeeId || !phoneNumber || !password) {
+    return res.status(400).json({ message: 'Employee ID, phone number and password are required.' });
   }
 
-  const user = await User.findOne({ where: { employeeId: employeeId.trim().toUpperCase() } });
+  const normalizedPhoneNumber = String(phoneNumber).replace(/\D/g, '');
+  const user = await User.findOne({
+    where: {
+      employeeId: employeeId.trim().toUpperCase(),
+      phoneNumber: normalizedPhoneNumber,
+    },
+  });
   if (!user) {
     return res.status(401).json({ message: 'Invalid Employee ID or password.' });
   }

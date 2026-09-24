@@ -18,6 +18,15 @@ const User = sequelize.define(
         this.setDataValue('employeeId', String(value).trim().toUpperCase());
       },
     },
+    phoneNumber: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      field: 'phone_number',
+      set(value) {
+        this.setDataValue('phoneNumber', String(value).replace(/\D/g, ''));
+      },
+    },
     name: { type: DataTypes.STRING, allowNull: false },
     designation: { type: DataTypes.STRING, defaultValue: '' },
     department: { type: DataTypes.STRING, defaultValue: 'National Informatics Centre' },
@@ -43,6 +52,7 @@ User.prototype.toSafeJSON = function toSafeJSON() {
   return {
     id: this.id,
     employeeId: this.employeeId,
+    phoneNumber: this.phoneNumber,
     name: this.name,
     designation: this.designation,
     department: this.department,

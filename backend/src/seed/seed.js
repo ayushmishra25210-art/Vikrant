@@ -44,13 +44,14 @@ async function makeSamplePdf(title, bodyLines, classification) {
   return pdfDoc.save();
 }
 
-async function createUser({ employeeId, name, designation, department, role, password }) {
+async function createUser({ employeeId, phoneNumber, name, designation, department, role, password }) {
   const rsa = cryptoService.generateRSAKeyPair();
   const ed = cryptoService.generateEd25519KeyPair();
   const passwordHash = await bcrypt.hash(password, 10);
 
   return User.create({
     employeeId,
+    phoneNumber,
     name,
     designation,
     department,
@@ -158,6 +159,7 @@ async function main() {
   console.log('[SEED] Creating users (generating RSA-4096 + Ed25519 keypairs, this takes a few seconds)...');
   const admin = await createUser({
     employeeId: 'EMP001',
+    phoneNumber: '9876543201',
     name: 'Rajesh Kumar Sharma',
     designation: 'Under Secretary',
     department: 'National Informatics Centre',
@@ -167,6 +169,7 @@ async function main() {
 
   const recipient1 = await createUser({
     employeeId: 'EMP101',
+    phoneNumber: '9876543202',
     name: 'Anita Desai',
     designation: 'Section Officer',
     department: 'Ministry of Electronics & IT',
@@ -175,6 +178,7 @@ async function main() {
   });
   const recipient2 = await createUser({
     employeeId: 'EMP102',
+    phoneNumber: '9876543203',
     name: 'Vikram Singh Rathore',
     designation: 'Deputy Director',
     department: 'Ministry of Home Affairs',
@@ -183,6 +187,7 @@ async function main() {
   });
   const recipient3 = await createUser({
     employeeId: 'EMP103',
+    phoneNumber: '9876543204',
     name: 'Priya Nair',
     designation: 'Assistant Director',
     department: 'Ministry of Defence',
