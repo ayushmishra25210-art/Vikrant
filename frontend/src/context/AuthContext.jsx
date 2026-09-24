@@ -11,11 +11,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const login = useCallback(async (employeeId, password) => {
+  const login = useCallback(async (employeeId, phoneNumber, password) => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await apiClient.post('/auth/login', { employeeId, password });
+      const { data } = await apiClient.post('/auth/login', { employeeId, phoneNumber, password });
       localStorage.setItem('epr_token', data.token);
       localStorage.setItem('epr_user', JSON.stringify(data.user));
       setUser(data.user);

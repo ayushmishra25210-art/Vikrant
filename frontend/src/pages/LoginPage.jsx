@@ -4,16 +4,17 @@ import { Lock, User, Loader2, Fingerprint, MessageSquareLock, KeyRound } from 'l
 import { useAuth } from '../context/AuthContext';
 
 const DEMO_CREDENTIALS = [
-  { role: 'Admin', employeeId: 'EMP001', password: 'Admin@123', name: 'Rajesh Kumar Sharma' },
-  { role: 'Recipient', employeeId: 'EMP101', password: 'Recipient@123', name: 'Anita Desai' },
-  { role: 'Recipient', employeeId: 'EMP102', password: 'Recipient@123', name: 'Vikram Singh Rathore' },
-  { role: 'Recipient', employeeId: 'EMP103', password: 'Recipient@123', name: 'Priya Nair' },
+  { role: 'Admin', employeeId: 'EMP001', phoneNumber: '9876543201', password: 'Admin@123', name: 'Rajesh Kumar Sharma' },
+  { role: 'Recipient', employeeId: 'EMP101', phoneNumber: '9876543202', password: 'Recipient@123', name: 'Anita Desai' },
+  { role: 'Recipient', employeeId: 'EMP102', phoneNumber: '9876543203', password: 'Recipient@123', name: 'Vikram Singh Rathore' },
+  { role: 'Recipient', employeeId: 'EMP103', phoneNumber: '9876543204', password: 'Recipient@123', name: 'Priya Nair' },
 ];
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [employeeId, setEmployeeId] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ export default function LoginPage() {
 
   const fillCredentials = (cred) => {
     setEmployeeId(cred.employeeId);
+    setPhoneNumber(cred.phoneNumber);
     setPassword(cred.password);
     setError('');
     setNotice('');
@@ -31,7 +33,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(employeeId, password);
+      const user = await login(employeeId, phoneNumber, password);
       navigate(user.role === 'admin' ? '/admin/dashboard' : '/recipient/dashboard');
     } catch (err) {
       setError(err.message);
@@ -81,6 +83,22 @@ export default function LoginPage() {
               {error && <p className="text-[12.5px] text-danger bg-danger-bg border border-red-200 rounded px-3 py-2 mb-3">{error}</p>}
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="gov-label">Phone Number</label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="tel"
+                      className="gov-input pl-9"
+                      placeholder="e.g. 9876543201"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      autoComplete="tel"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="gov-label">Employee ID</label>
                   <div className="relative">
@@ -165,6 +183,7 @@ export default function LoginPage() {
                       <span className="font-mono text-[12.5px] font-medium text-gray-900">{cred.employeeId}</span>
                     </div>
                     <p className="text-[11.5px] text-gray-600 truncate">{cred.name}</p>
+                    <p className="font-mono text-[11px] text-gray-400">{cred.phoneNumber}</p>
                     <p className="font-mono text-[11px] text-gray-400">{cred.password}</p>
                   </div>
                   <button
